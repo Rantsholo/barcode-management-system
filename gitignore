@@ -1,0 +1,17 @@
+# Streamlit secrets — never commit real credentials
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data exports (may contain real submissions if you test locally)
+*.csv
+*.xlsx
+!sample_data.csv
+
+# OS / editor
+.DS_Store
+.vscode/
