@@ -156,15 +156,6 @@ div[data-testid="stNotificationContentSuccess"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SAMPLE / PLACEHOLDER DATA
-# ═══════════════════════════════════════════════════════════════════════════
-# NOTE: This is a sanitized public copy. The rows below are generic placeholder
-# entries — not real inventory. Replace with your own catalog before deploying.
-# The specific codes kept here (DT50, PM450, RF 008, Cage Tag, etc.) exist only
-# so every calculation branch below (tag-based items, nameplate items,
-# multiplier-one items, stock-out-by-tag items) still has something to match
-# against for testing/demo purposes.
 Active_Items = [
     ("1Z", "Sample Mesh Cage Type 1Z", "Aluminium", "140 x 100 x 0.5", "Yes"),
     ("1A", "Sample Mesh Cage Type 1A", "Aluminium", "140 x 100 x 0.5", "Yes"),
@@ -193,17 +184,14 @@ Active_Items = [
     ("SSO", "Short Order", "N/A", "", "No"),
 ]
 
-# Lookup to Auto populate under Item description section
 item_lookup = {row[0]: {"item_desc": row[1], "barcode_type": row[2],
                          "nameplate_size": row[3], "require_nameplate": row[4]}
                for row in Active_Items}
 
 STOCK_TYPES = [row[0] for row in Active_Items]
 
-# Tags field will show if the item type is selected
 Tag_Item_Types = {"Interlayer", "Cage Tag", "KLT Bins Tag", "Omega Agri Bins Tag", "Crimp Clips", "Metal Plate", "Stika Type", "Zip Lock Bag", "RFID Tag Inlay"}
 
-# Column multiplier under submission tab
 MULTIPLIER_ONE_BARCODE_TYPES = {
     "Skid Labels", "Paper", "Bolts", "Nuts",
     "Cage tag", "Cage Tag", "KLT Bins Tag", "Agri Bins Tag", "OMNI ID Tags",
@@ -212,7 +200,6 @@ MULTIPLIER_ONE_BARCODE_TYPES = {
 }
 MULTIPLIER_ONE_STOCK_TYPES = {"DT50", "PM450"}
 
-# Stock Out will equal number of tags for selected item type
 STOCK_OUT_TAGS_BARCODE_TYPES = {
     "Cage Tag", "KLT Bins Tag", "Agri Bins Tag",
     "OMNI ID Tags", "Pallet Tag", "Label - KLT tags", "Bins Tag",
@@ -232,12 +219,29 @@ DEPOTS = [
 
 ACTIVITIES = ["Barcode Replacement", "Maintenance", "Outright Sale", "Capex", "Waste"]
 
-#Superbase secretes
 @st.cache_resource
 def get_supabase() -> Client:
-    url = st.secrets["supabase"]["url"]
-    key = st.secrets["supabase"]["key"]
-    return create_client(url, key)
+    """
+    Build the Supabase client. Wrapped so a missing/misconfigured
+    st.secrets["supabase"] doesn't crash the whole app with an
+    unhandled exception before any widget renders.
+    """
+    try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+    except Exception:
+        st.error(
+            "⚠️ Supabase is not configured. Add a `[supabase]` section with "
+            "`url` and `key` to your `secrets.toml` (or Streamlit Cloud "
+            "secrets) and reload the app."
+        )
+        st.stop()
+
+    try:
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"⚠️ Failed to connect to Supabase: {e}")
+        st.stop()
 
 supabase = get_supabase()
 
@@ -246,7 +250,6 @@ def load_submissions():
     try:
         response = supabase.table("submissions").select("*").order("id").execute()
         rows = response.data or []
-        # Drop the internal 'id' column — app doesn't need it
         clean = [{k: v for k, v in r.items() if k != "id"} for r in rows]
         st.session_state.submissions = clean
     except Exception as e:
@@ -254,27 +257,23 @@ def load_submissions():
         st.session_state.submissions = []
 
 def save_rows(rows: list):
-    """Insert a list of row dicts into Supabase."""
     try:
         supabase.table("submissions").insert(rows).execute()
     except Exception as e:
         st.error(f"Failed to save to Supabase: {e}")
 
 def delete_ticket_from_db(ticket_number: str):
-    """Delete all rows for a given ticket number from Supabase."""
     try:
         supabase.table("submissions").delete().eq("Ticket Number", ticket_number).execute()
     except Exception as e:
         st.error(f"Failed to delete from Supabase: {e}")
 
 def clear_all_submissions_db():
-    """Delete all rows from Supabase submissions table."""
     try:
         supabase.table("submissions").delete().neq("id", 0).execute()
     except Exception as e:
         st.error(f"Failed to clear Supabase: {e}")
 
-# Load from Supabase on first run only
 if "submissions" not in st.session_state:
     load_submissions()
 
@@ -284,7 +283,6 @@ if "item_rows" not in st.session_state:
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
 
-# Helper Functions
 def get_item_info(stock_type):
     return item_lookup.get(stock_type, {"item_desc": "", "barcode_type": "",
                                          "nameplate_size": "", "require_nameplate": "No"})
@@ -322,20 +320,11 @@ def compute_item_type_qty(item_desc, barcode_type, stock_type, tags, total_barco
 # Main User Interface
 st.markdown("# 🏷️ BARCODE REPLACEMENT DASHBOARD")
 
-info_col, logout_col = st.columns([6, 1])
-with info_col:
-    st.caption(f" Logged in as **{current_user}** &nbsp;|&nbsp; Role: **{current_role.capitalize()}**")
-with logout_col:
-    if st.button(" Logout", use_container_width=True):
-        for key in ["authenticated", "username", "role"]:
-            st.session_state.pop(key, None)
-        st.rerun()
-
+st.caption("Open Access")
 st.markdown("---")
 
-# Tabs appear depending on the role
 TAB_LABELS = {"capture": "CAPTURE FORM", "submissions": "SUBMISSIONS TABLE", "delivery": "DELIVERY NOTE"}
-accessible_tabs = [t for t in ["capture", "submissions", "delivery"] if can_access_tab(current_role, t)]
+accessible_tabs = [t for t in ["capture", "submissions", "delivery"] if can_access_tab(t)]
 tab_objects = st.tabs([TAB_LABELS[t] for t in accessible_tabs])
 tab_map = {key: tab_objects[i] for i, key in enumerate(accessible_tabs)}
 
@@ -344,13 +333,10 @@ def get_tab(name):
     return tab_map.get(name, None)
 
 
-# Capture Form Tab 1
-
 if get_tab('capture'):
   with get_tab('capture'):
     st.markdown("### REQUEST DETAILS")
 
-    # Shared fields 
     col1, col2, col3 = st.columns(3)
     with col1:
         date_sent = st.date_input("Date Sent", value=date.today(), key=f"date_sent_{st.session_state.form_key}")
@@ -359,7 +345,6 @@ if get_tab('capture'):
     with col3:
         ticket_number = st.text_input("Ticket Number *", key=f"ticket_number_{st.session_state.form_key}")
 
-    # Conditional fields
     po_number = ""
     capex_number = ""
     if activity == "Outright Sale":
@@ -388,7 +373,6 @@ if get_tab('capture'):
     st.markdown("### ITEM TYPES")
     st.caption("Add one row per item type. Fields auto-populate from the Active Item Types table.")
 
-    # ── Dynamic item rows ──────────────────────────────────────────────────
     def add_row():
         st.session_state.item_rows.append({})
 
@@ -408,8 +392,7 @@ if get_tab('capture'):
                     [""] + STOCK_TYPES,
                     key=f"st_{i}_{st.session_state.form_key}",
                 )
-            
-            # Auto-populate Item Description
+
             info = get_item_info(stock_type) if stock_type else {"item_desc": "", "barcode_type": "", "nameplate_size": "", "require_nameplate": "No"}
             item_desc = info["item_desc"]
             require_nameplate = info["require_nameplate"]
@@ -428,7 +411,6 @@ if get_tab('capture'):
                     remove_row(i)
                     st.rerun()
 
-            # Nameplate field (hidden unless Item Description = Aluminium AND requires nameplate)
             if barcode_type == "Aluminium" and require_nameplate == "Yes":
                 col_np1, col_np2 = st.columns(2)
                 with col_np1:
@@ -475,19 +457,16 @@ if get_tab('capture'):
             else:
                 tags = 0
 
-            # ── Hidden calculations ────────────────────────────────────────
             multiplier = compute_multiplier(stock_type, barcode_type)
             total_barcodes = barcodes_requested * multiplier if not tag_based else 0
 
-            # Total Nameplates (hidden unless nameplate = Yes)
             total_nameplates = 0
             if require_nameplate == "Yes" and not tag_based:
-                total_nameplates = total_barcodes  # 1 nameplate per barcode
+                total_nameplates = total_barcodes
 
             stock_out = compute_stock_out(stock_type, barcode_type, tags,
                                           total_barcodes, total_nameplates)
 
-            # Show Total Nameplates if applicable
             if require_nameplate == "Yes" and not tag_based:
                 st.info(f"**Total Nameplates:** {total_nameplates}  |  **Total Barcodes:** {total_barcodes}  |  **Stock Out:** {stock_out}")
             elif not tag_based:
@@ -495,7 +474,6 @@ if get_tab('capture'):
             else:
                 st.info(f"**Stock Out (Tags):** {stock_out}")
 
-            # Store row data in session state
             st.session_state.item_rows[i] = {
                 "stock_type": stock_type,
                 "item_desc": item_desc,
@@ -516,7 +494,6 @@ if get_tab('capture'):
 
     st.markdown("---")
 
-    # ── Submit ─────────────────────────────────────────────────────────────
     if st.button("  SUBMIT REQUEST"):
         errors = []
         if activity == "— Select Activity —":
@@ -572,10 +549,8 @@ if get_tab('capture'):
                     "Item Type": na_if_empty(r["item_desc"]),
                     "Multiplier": multiplier,
                     "Item Type (Quantity)": item_type_qty,
-                    # Extra activity fields — force N/A when activity doesn't require them
                     "PO Number": na_if_empty(po_number) if activity == "Outright Sale" else "N/A",
                     "Capex Number": na_if_empty(capex_number) if activity == "Capex" else "N/A",
-                    "Nameplate":na_if_empty(require_nameplate) if "barcode_type" else "N/A"
                 })
 
             st.session_state.submissions.extend(new_rows)
@@ -586,8 +561,6 @@ if get_tab('capture'):
             st.rerun()
 
 
-# Tab 2 submissions table
-
 if get_tab('submissions'):
   with get_tab('submissions'):
     st.markdown("### ALL SUBMISSIONS")
@@ -597,14 +570,12 @@ if get_tab('submissions'):
     else:
         df_all = pd.DataFrame(st.session_state.submissions)
 
-        # Numeric columns — only true integer fields
         numeric_cols = ["Barcodes Requested", "Total Barcodes", "Total Nameplates",
                         "Tags", "Stock Out", "Multiplier"]
         for col in numeric_cols:
             if col in df_all.columns:
                 df_all[col] = pd.to_numeric(df_all[col], errors="coerce").fillna(0).astype(int)
 
-        # String columns — everything that could be text including Multiplier, Item Type (Quantity)
         str_cols = ["Date Sent", "Stock Type", "Activity", "Item Description",
                     "Requested By", "Issued To", "Ticket Number", "Waybill",
                     "Capex Number", "PO Number", "Comment", "Item Type", "Nameplate",
@@ -613,7 +584,6 @@ if get_tab('submissions'):
             if col in df_all.columns:
                 df_all[col] = df_all[col].astype(str).str.strip().replace({"nan": "N/A", "None": "N/A", "none": "N/A"})
 
-        #Metrics
         m1, m2, m3, m4 = st.columns(4)
         with m1:
             st.markdown(f'<div class="metric-box"><div class="val">{len(df_all)}</div><div class="lbl">Total Rows</div></div>', unsafe_allow_html=True)
@@ -632,7 +602,6 @@ if get_tab('submissions'):
 
         st.markdown("---")
 
-        # Filters
         st.markdown('<div class="section-header">FILTERS</div>', unsafe_allow_html=True)
         fc1, fc2, fc3, fc4 = st.columns(4)
 
@@ -649,7 +618,6 @@ if get_tab('submissions'):
             all_requestors = sorted([str(v) for v in df_all["Requested By"].unique() if v is not None and str(v) not in ("nan", "N/A", "")])
             sel_requestors = st.multiselect("Requested By", options=all_requestors, default=[])
 
-        # Apply filters — empty selection means "show all" for that filter
         mask = pd.Series([True] * len(df_all))
         if sel_dates:
             mask &= df_all["Date Sent"].isin(sel_dates)
@@ -666,7 +634,6 @@ if get_tab('submissions'):
         st.caption(f"Showing {len(df)} of {len(df_all)} rows")
         st.markdown("---")
 
-        # Ordered columns 
         display_cols = [
             "Date Sent", "Stock Type", "Activity", "Item Description",
             "Barcodes Requested", "Total Barcodes", "Total Nameplates",
@@ -681,8 +648,7 @@ if get_tab('submissions'):
 
         st.markdown("---")
 
-        # Delete by Ticket Number
-        if can_use_feature(current_role, "delete_ticket"):
+        if can_use_feature("delete_ticket"):
             st.markdown("#### 🗑️ Delete by Ticket Number")
             all_tickets = sorted([t for t in df_all["Ticket Number"].unique() if t != "N/A"])
             if all_tickets:
@@ -694,7 +660,6 @@ if get_tab('submissions'):
                     if st.button("🗑️  DELETE TICKET"):
                         st.session_state["pending_delete_ticket"] = ticket_to_delete
 
-                # Confirmation prompt
                 if st.session_state.get("pending_delete_ticket") == ticket_to_delete:
                     row_count = sum(
                         1 for r in st.session_state.submissions
@@ -721,7 +686,6 @@ if get_tab('submissions'):
 
             st.markdown("---")
 
-        # Import Data
         st.markdown("Import Data")
         uploaded_file = st.file_uploader(
             "Upload a previously exported CSV or Excel file to restore data",
@@ -735,52 +699,59 @@ if get_tab('submissions'):
                 else:
                     import_df = pd.read_excel(uploaded_file, dtype=str).fillna("N/A")
 
-                # ── Fix column types to match what the app expects ──
-                # Numeric columns — convert to int where possible
-                numeric_cols = ["Barcodes Requested", "Total Barcodes", "Total Nameplates",
-                                "Tags", "Stock Out", "Multiplier"]
-                for col in numeric_cols:
-                    if col in import_df.columns:
-                        import_df[col] = pd.to_numeric(import_df[col], errors="coerce").fillna(0).astype(int)
+                required_cols = {"Ticket Number", "Date Sent", "Stock Type",
+                                  "Activity", "Requested By", "Issued To"}
+                missing_cols = required_cols - set(import_df.columns)
 
-                # String columns — strip whitespace, replace nan strings with N/A
-                str_cols = ["Date Sent", "Stock Type", "Activity", "Item Description",
-                            "Requested By", "Issued To", "Ticket Number", "Waybill",
-                            "Capex Number", "PO Number", "Comment", "Item Type",
-                            "Nameplate", "Take-On", "Item Type (Quantity)"]
-                for col in str_cols:
-                    if col in import_df.columns:
-                        import_df[col] = import_df[col].astype(str).str.strip().replace({"nan": "N/A", "None": "N/A", "none": "N/A"})
-
-                imp_col1, imp_col2 = st.columns([2, 1])
-                with imp_col1:
-                    st.success(f"File loaded: **{len(import_df)} rows** detected. Choose how to import:")
-                with imp_col2:
-                    import_mode = st.radio(
-                        "Import mode",
-                        ["Append to existing", "Replace all data"],
-                        key="import_mode"
+                if missing_cols:
+                    st.error(
+                        f"❌ This file can't be imported — it's missing required "
+                        f"column(s): {', '.join(sorted(missing_cols))}. "
+                        f"Please upload a file exported from this app."
                     )
+                else:
+                    numeric_cols = ["Barcodes Requested", "Total Barcodes", "Total Nameplates",
+                                    "Tags", "Stock Out", "Multiplier"]
+                    for col in numeric_cols:
+                        if col in import_df.columns:
+                            import_df[col] = pd.to_numeric(import_df[col], errors="coerce").fillna(0).astype(int)
 
-                if st.button("✅ CONFIRM IMPORT"):
-                    imported_records = import_df.to_dict(orient="records")
-                    if import_mode == "Replace all data":
-                        clear_all_submissions_db()
-                        save_rows(imported_records)
-                        st.session_state.submissions = imported_records
-                        st.success(f"All data replaced with {len(imported_records)} imported rows.")
-                    else:
-                        save_rows(imported_records)
-                        st.session_state.submissions.extend(imported_records)
-                        st.success(f"{len(imported_records)} rows appended to existing data.")
-                    st.rerun()
+                    str_cols = ["Date Sent", "Stock Type", "Activity", "Item Description",
+                                "Requested By", "Issued To", "Ticket Number", "Waybill",
+                                "Capex Number", "PO Number", "Comment", "Item Type",
+                                "Nameplate", "Take-On", "Item Type (Quantity)"]
+                    for col in str_cols:
+                        if col in import_df.columns:
+                            import_df[col] = import_df[col].astype(str).str.strip().replace({"nan": "N/A", "None": "N/A", "none": "N/A"})
+
+                    imp_col1, imp_col2 = st.columns([2, 1])
+                    with imp_col1:
+                        st.success(f"File loaded: **{len(import_df)} rows** detected. Choose how to import:")
+                    with imp_col2:
+                        import_mode = st.radio(
+                            "Import mode",
+                            ["Append to existing", "Replace all data"],
+                            key="import_mode"
+                        )
+
+                    if st.button("✅ CONFIRM IMPORT"):
+                        imported_records = import_df.to_dict(orient="records")
+                        if import_mode == "Replace all data":
+                            clear_all_submissions_db()
+                            save_rows(imported_records)
+                            st.session_state.submissions = imported_records
+                            st.success(f"All data replaced with {len(imported_records)} imported rows.")
+                        else:
+                            save_rows(imported_records)
+                            st.session_state.submissions.extend(imported_records)
+                            st.success(f"{len(imported_records)} rows appended to existing data.")
+                        st.rerun()
 
             except Exception as e:
                 st.error(f"Failed to read file: {e}")
 
         st.markdown("---")
 
-        # Export Data
         import io
         dl1, dl2, dl3 = st.columns([1, 1, 4])
         export_df = df_all[display_cols]
@@ -805,11 +776,6 @@ if get_tab('submissions'):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
-# Tab 3 — Delivery Note
-# NOTE: All contact names, phone numbers, and addresses below are fake
-# placeholder data for the public repo. Replace with real depot details
-# in your own local copy / secrets before deploying.
-
 DEPOT_INFO = {
     "ROS Depot":   {"full_name": "Sample Depot 1", "street": "1 Example Street",   "city": "Sample City",   "postal": "0001", "contact": "Jane Doe",   "tel": "000 000 0001"},
     "WDV Depot":   {"full_name": "Sample Depot 2", "street": "2 Example Street",   "city": "Sample City",   "postal": "0002", "contact": "John Smith", "tel": "000 000 0002"},
@@ -832,6 +798,8 @@ if get_tab('delivery'):
         st.info("No submissions yet. Use the Capture Form tab to submit requests.")
     else:
         df_dn = pd.DataFrame(st.session_state.submissions)
+        if "Ticket Number" not in df_dn.columns:
+            df_dn["Ticket Number"] = "N/A"
         available_tickets = sorted([t for t in df_dn["Ticket Number"].unique() if t != "N/A"])
 
         if not available_tickets:
@@ -863,8 +831,7 @@ if get_tab('delivery'):
                 st.markdown(f"**Telephone:** {depot_data['tel']}")
 
             st.markdown("##### Delivery Address")
-            if can_use_feature(current_role, "delete_ticket"):
-                # Admin: editable fields, keyed to selected_ticket so they reset on ticket change
+            if can_use_feature("delete_ticket"):
                 addr1, addr2 = st.columns(2)
                 with addr1:
                     addr_name   = st.text_input("Company / Depot Name", value=depot_data['full_name'], key=f"dn_addr_name_{selected_ticket}")
@@ -873,7 +840,6 @@ if get_tab('delivery'):
                     addr_city   = st.text_input("City / Town", value=depot_data['city'], key=f"dn_addr_city_{selected_ticket}")
                     addr_postal = st.text_input("Postal Code", value=depot_data['postal'], key=f"dn_addr_postal_{selected_ticket}")
             else:
-                # Non-admin: read-only display
                 addr_name   = depot_data['full_name']
                 addr_street = depot_data['street']
                 addr_city   = depot_data['city']
@@ -882,7 +848,6 @@ if get_tab('delivery'):
 
             st.markdown("---")
 
-            # Build line items
             line_items_html = ""
             for _, row in ticket_rows.iterrows():
                 stock_out_val = row.get("Stock Out", "")
@@ -924,7 +889,6 @@ if get_tab('delivery'):
     margin: 0 auto;
   }}
 
-  /* ── PRINT BUTTON ── */
   .print-btn {{
     display: block; margin: 0 auto 16px auto;
     padding: 9px 36px; background: #1a1a1a; color: #fff;
@@ -933,7 +897,6 @@ if get_tab('delivery'):
   }}
   .print-btn:hover {{ background: #333; }}
 
-  /* ── LOGO AREA ── */
   .logo-row {{
     display: flex; justify-content: flex-end; margin-bottom: 4px;
   }}
@@ -948,14 +911,12 @@ if get_tab('delivery'):
     display: inline-block;
   }}
 
-  /* ── TITLE ── */
   .dn-title {{
     text-align: center; font-size: 18px; font-weight: bold;
     letter-spacing: 0.08em; text-transform: uppercase;
     margin-bottom: 14px;
   }}
 
-  /* ── HEADER TABLE (label rows) ── */
   .header-section {{
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -979,7 +940,6 @@ if get_tab('delivery'):
     font-size: 11px; flex: 1; padding-bottom: 1px;
   }}
 
-  /* ── ITEMS TABLE ── */
   table.items {{
     width: 100%; border-collapse: collapse; margin-bottom: 14px;
   }}
@@ -995,7 +955,6 @@ if get_tab('delivery'):
   table.items td:first-child {{ text-align: center; border-right: 2px solid #555; }}
   table.items tr.empty-row td {{ height: 22px; }}
 
-  /* ── SIGNATURE BLOCKS ── */
   .sig-box {{
     border: 1px solid #000; padding: 10px 12px; margin-bottom: 10px;
   }}
@@ -1024,7 +983,6 @@ if get_tab('delivery'):
     border-bottom: 1px solid #000; flex: 1;
   }}
 
-  /* ── FOOTER ── */
   .footer {{
     border-top: 1.5px solid #000; margin-top: 14px;
     padding-top: 8px;
@@ -1057,17 +1015,13 @@ if get_tab('delivery'):
 
 <button class="print-btn no-print" onclick="window.print()">🖨&nbsp; PRINT / SAVE AS PDF</button>
 
-<!-- LOGO (placeholder — replace with your own company logo) -->
 <div class="logo-row">
   <span class="logo-placeholder">ACME LOGISTICS</span>
 </div>
 
-<!-- TITLE -->
 <div class="dn-title">DELIVERY NOTE</div>
 
-<!-- HEADER: two-column label rows -->
 <div class="header-section">
-  <!-- LEFT COLUMN -->
   <div>
     <div class="hrow">
       <div class="hlabel">To :</div>
@@ -1091,7 +1045,6 @@ if get_tab('delivery'):
     </div>
   </div>
 
-  <!-- RIGHT COLUMN -->
   <div>
     <div class="hrow">
       <div class="hlabel">Your Order Number :</div>
@@ -1120,7 +1073,6 @@ if get_tab('delivery'):
   </div>
 </div>
 
-<!-- LINE ITEMS TABLE -->
 <table class="items">
   <thead>
     <tr>
@@ -1133,7 +1085,6 @@ if get_tab('delivery'):
   </tbody>
 </table>
 
-<!-- SIG BLOCK 1: Transporter -->
 <div class="sig-box">
   <div class="sig-box-title">Transporter &#8211; Collection Note - Goods received in good order</div>
   <div class="waybill-row">
@@ -1156,7 +1107,6 @@ if get_tab('delivery'):
   </div>
 </div>
 
-<!-- SIG BLOCK 2: Goods received -->
 <div class="sig-box">
   <div class="sig-box-title">Goods received in good order</div>
   <div class="sig-row">
@@ -1175,7 +1125,6 @@ if get_tab('delivery'):
   </div>
 </div>
 
-<!-- FOOTER (placeholder company details — replace before real use) -->
 <div class="footer">
   <div class="footer-left">
     123 Example Street, Sample Business Park, Sample City, 0000<br>
