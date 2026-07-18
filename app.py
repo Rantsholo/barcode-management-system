@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-#Page_Configureation
+#configure the page
 st.set_page_config(
     page_title="Barcode Replacement Dashboard",
     page_icon="🏷️",
@@ -11,19 +11,13 @@ st.set_page_config(
 
 from supabase import create_client, Client
 
-# NOTE: Login/authentication was intentionally removed — this app is open
-# access. Everyone gets full access to all tabs and features (capture,
-# submissions, delivery note, ticket deletion). If you need to restrict
-# access later, do it at the network level (private deployment, VPN, or a
-# reverse proxy with auth) rather than reintroducing an in-app password.
-
 def can_access_tab(tab):
     return True
 
 def can_use_feature(feature):
     return True
 
-# Custom CSS
+# customize css
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
@@ -217,7 +211,7 @@ DEPOTS = [
     "Other",
 ]
 
-ACTIVITIES = ["Barcode Replacement", "Maintenance", "Outright Sale", "Capex", "Waste"]
+ACTIVITIES = ["Barcode Replacement", "Other",]
 
 @st.cache_resource
 def get_supabase() -> Client:
