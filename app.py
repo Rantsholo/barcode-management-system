@@ -208,12 +208,12 @@ STOCK_OUT_TAGS_BARCODE_TYPES = {
 STOCK_OUT_TAGS_STOCK_TYPES = {"RF 008"}
 
 DEPOTS = [
-    "PE Depot",
-    "ROS Depot",
-    "CPT Depot",
-    "DBN Depot",
-    "WDV Depot",
-    "ESL Depot",
+    "Depot 1",
+    "Depot 2",
+    "Depot 3",
+    "Depot 4",
+    "Depot 5",
+    "Depot 6",
     "Other",
 ]
 
@@ -777,12 +777,12 @@ if get_tab('submissions'):
             )
 
 DEPOT_INFO = {
-    "ROS Depot":   {"full_name": "Sample Depot 1", "street": "1 Example Street",   "city": "Sample City",   "postal": "0001", "contact": "Jane Doe",   "tel": "000 000 0001"},
-    "WDV Depot":   {"full_name": "Sample Depot 2", "street": "2 Example Street",   "city": "Sample City",   "postal": "0002", "contact": "John Smith", "tel": "000 000 0002"},
-    "DBN Depot":   {"full_name": "Sample Depot 3", "street": "3 Example Street",   "city": "Sample City",   "postal": "0003", "contact": "Alex Brown", "tel": "000 000 0003"},
-    "CPT Depot":   {"full_name": "Sample Depot 4", "street": "4 Example Street",   "city": "Sample City",   "postal": "0004", "contact": "Sam Jones",  "tel": "000 000 0004"},
-    "PE Depot":    {"full_name": "Sample Depot 5", "street": "5 Example Street",   "city": "Sample City",   "postal": "0005", "contact": "Chris Lee",  "tel": "000 000 0005"},
-    "ESL Depot":   {"full_name": "Sample Depot 6", "street": "6 Example Street",   "city": "Sample City",   "postal": "0006", "contact": "Pat Taylor", "tel": "000 000 0006"},
+    "Depot 1":   {"full_name": "Sample Depot 1", "street": "1 Example Street",   "city": "Sample City",   "postal": "0001", "contact": "Jane Doe",   "tel": "000 000 0001"},
+    "Depot 2":   {"full_name": "Sample Depot 2", "street": "2 Example Street",   "city": "Sample City",   "postal": "0002", "contact": "John Smith", "tel": "000 000 0002"},
+    "Depot 3":   {"full_name": "Sample Depot 3", "street": "3 Example Street",   "city": "Sample City",   "postal": "0003", "contact": "Alex Brown", "tel": "000 000 0003"},
+    "Depot 4":   {"full_name": "Sample Depot 4", "street": "4 Example Street",   "city": "Sample City",   "postal": "0004", "contact": "Sam Jones",  "tel": "000 000 0004"},
+    "Depot 5":    {"full_name": "Sample Depot 5", "street": "5 Example Street",   "city": "Sample City",   "postal": "0005", "contact": "Chris Lee",  "tel": "000 000 0005"},
+    "Depot 6":   {"full_name": "Sample Depot 6", "street": "6 Example Street",   "city": "Sample City",   "postal": "0006", "contact": "Pat Taylor", "tel": "000 000 0006"},
     "Sample Site A": {"full_name": "Sample Site A", "street": "7 Example Street",  "city": "Sample City",   "postal": "0007", "contact": "",           "tel": ""},
     "Sample Site B": {"full_name": "Sample Site B", "street": "8 Example Street",  "city": "Sample City",   "postal": "0008", "contact": "",           "tel": ""},
     "Sample Site C": {"full_name": "Sample Site C", "street": "9 Example Street",  "city": "Sample City",   "postal": "0009", "contact": "",           "tel": ""},
