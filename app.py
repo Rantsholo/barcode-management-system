@@ -211,7 +211,7 @@ DEPOTS = [
     "Other",
 ]
 
-ACTIVITIES = ["Barcode Replacement", "Other",]
+ACTIVITIES = ["Barcode Replacement", "Tag Replacement",]
 
 @st.cache_resource
 def get_supabase() -> Client:
